@@ -1,9 +1,16 @@
 /**
  * eBay price scraper using Puppeteer (for JavaScript-rendered content)
  */
-import puppeteer from 'puppeteer';
-import { logger, formatCardName } from "../common-lite.js";
+// @ts-ignore - puppeteer-extra types are incompatible with NodeNext module resolution
+import puppeteer from 'puppeteer-extra';
+// @ts-ignore
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { logger, formatCardName } from "../common.js";
 import clc from "cli-color";
+
+// Add stealth plugin to avoid bot detection
+// @ts-ignore
+puppeteer.use(StealthPlugin());
 
 const raw = "-PSA -BGS -CGC";
 const grade10 = "(PSA 10,BGS 10,CGC 10)";
@@ -17,6 +24,7 @@ let browser: any = null;
  */
 async function getBrowser() {
   if (!browser) {
+    // @ts-ignore
     browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -25,9 +33,10 @@ async function getBrowser() {
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
+        '--disable-blink-features=AutomationControlled'
       ]
     });
-    logger.info(clc.green('Puppeteer browser launched'));
+    logger.info(clc.green('✓ Puppeteer browser launched with stealth mode'));
   }
   return browser;
 }
@@ -59,8 +68,7 @@ export async function scrapeEbay(card: any, type: string): Promise<number> {
   url.searchParams.set("kw", searchQuery);
   url.searchParams.set("LH_BIN", "1"); // Buy It Now only
   url.searchParams.set("_sop", "15"); // Sort by price + shipping: lowest first
-  url.searchParams.set("LH_Sold", "1"); // Sold listings
-  url.searchParams.set("LH_Complete", "1"); // Completed listings
+  // Note: Not using LH_Sold - we want active listings, not sold items
 
   logger.info(`ebay ${type} search: ${searchQuery}`);
   logger.debug(`URL: ${url.toString()}`);
@@ -74,32 +82,51 @@ export async function scrapeEbay(card: any, type: string): Promise<number> {
 
     // Navigate to page
     await page.goto(url.toString(), {
-      waitUntil: 'networkidle2',
-      timeout: 30000
+      waitUntil: 'domcontentloaded',
+      timeout: 60000
     });
+
+    // Wait a bit for JavaScript to execute
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Wait for results to load (with timeout)
     try {
-      await page.waitForSelector('.srp-results', { timeout: 10000 });
+      await page.waitForSelector('.srp-results', { timeout: 15000 });
     } catch (e) {
-      logger.warn(clc.yellow(`No results container found for ${card.name}, ${type}`));
+      logger.warn(clc.yellow(`No results found for ${card.name}, ${type}`));
       await page.close();
       return 0;
     }
 
     // Extract prices from the page
     const prices = await page.evaluate(() => {
-      const priceElements = document.querySelectorAll('.s-item__price');
+      const items = Array.from(document.querySelectorAll('.srp-results li'));
       const extractedPrices: number[] = [];
 
-      priceElements.forEach(el => {
-        const text = el.textContent || '';
-        // Match dollar amounts like "$12.34"
-        const match = text.match(/\$(\d+\.\d{2})/);
-        if (match) {
-          const price = parseFloat(match[1]);
-          if (!isNaN(price) && price > 0) {
-            extractedPrices.push(price);
+      items.forEach(item => {
+        // Try different selectors to find price
+        const priceSelectors = ['.s-item__price', '[class*="price"]', 'span'];
+        let priceText = '';
+        
+        for (const selector of priceSelectors) {
+          const el = item.querySelector(selector);
+          if (el && el.textContent?.includes('$')) {
+            priceText = el.textContent;
+            break;
+          }
+        }
+        
+        if (priceText) {
+          // Match dollar amounts - handle various formats
+          const matches = priceText.match(/\$([0-9,]+\.?\d{0,2})/g);
+          if (matches) {
+            matches.forEach(priceStr => {
+              const cleaned = priceStr.replace(/[$,]/g, '');
+              const price = parseFloat(cleaned);
+              if (!isNaN(price) && price > 0 && price < 10000) {
+                extractedPrices.push(price);
+              }
+            });
           }
         }
       });

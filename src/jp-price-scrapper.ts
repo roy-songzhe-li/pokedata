@@ -4,7 +4,7 @@ import * as cliProgress from 'cli-progress';
 import { consoleHeader, logger, setUpLogger } from './common.js';
 import { upsertPrice, useTestDbFile, getCardsByDate } from './database.js';
 import clc from 'cli-color';
-import { scrapeEbay } from './scrappers/ebay-scrapper.js';
+import { scrapeEbay, closeBrowser } from './scrappers/ebay-scrapper-puppeteer.js';
 import { Price, Card } from './model/Card.js';
 import Database from 'better-sqlite3';
 
@@ -40,10 +40,15 @@ export async function run() {
 
   consoleHeader('🎌 Japanese Card Price Scraper - Historical Data');
   
-  if (args.test) {
-    await scrapeTestCards();
-  } else {
-    await scrapeHistoricalPrices(args.months, args.limit);
+  try {
+    if (args.test) {
+      await scrapeTestCards();
+    } else {
+      await scrapeHistoricalPrices(args.months, args.limit);
+    }
+  } finally {
+    // Close Puppeteer browser
+    await closeBrowser();
   }
 }
 
