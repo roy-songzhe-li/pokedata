@@ -1,0 +1,90 @@
+/**
+ * eBay price scraper (lightweight version without SQLite dependencies)
+ * Used by Supabase-based scripts
+ */
+import * as jsdom from "jsdom";
+import fetch from "node-fetch";
+import { logger, formatCardName } from "../common-lite.js";
+import clc from "cli-color";
+
+const raw = "-PSA -BGS -CGC";
+const grade10 = "(PSA 10,BGS 10,CGC 10)";
+const grade9 = "(PSA 9,BGS 9,CGC 9)";
+const LH_BIN = "1";
+const _SOP = "15";
+const ebayUrl = "https://www.ebay.com/sch/i.html";
+
+/**
+ * Scrape ebay for price
+ * @param card Card object with name, expName, expCardNumber
+ * @param type (raw|grade9|grade10)
+ * @returns Median price from eBay listings
+ */
+export async function scrapeEbay(card: any, type: string): Promise<number> {
+  let url = new URL(ebayUrl);
+  let name = formatCardName(card.name);
+
+  switch (type) {
+    case "raw":
+      let kw = `(${card.expName})+(${name})+${card.expCardNumber} ${raw} -Digital -Online`;
+      logger.info(`ebay raw search: ${kw}`);
+      url.searchParams.set("kw", kw);
+      break;
+    case "grade9":
+      let kw9 = `(${card.expName})+(${name})+${card.expCardNumber} +${grade9} -Digital -Online`;
+      url.searchParams.set("kw", kw9);
+      logger.info(`ebay grade9 search: ${kw9}`);
+      break;
+    case "grade10":
+      let kw10 = `(${card.expName})+(${name})+${card.expCardNumber} +${grade10} -Digital -Online`;
+      logger.info(`ebay grade10 search: ${kw10}`);
+      url.searchParams.set("kw", kw10);
+      break;
+  }
+  url.searchParams.set("LH_BIN", LH_BIN);
+  url.searchParams.set("_SOP", _SOP);
+
+  let prices = [];
+  let resp;
+  try {
+    resp = await fetch(url.toString());
+  } catch (e) {
+    logger.error(clc.red(`Failed to pull data: ${e}`));
+    return 0;
+  }
+  let data = await resp.text();
+  const { window } = new jsdom.JSDOM(data);
+  const listings = window.document.getElementsByClassName("s-item__info");
+  if (listings.length === 0) logger.warn(`No listings found :( ${url.toString()}`);
+  for (let listing of listings) {
+    try {
+      let priceElement = listing.getElementsByClassName("s-item__price")[0];
+      if (!priceElement) continue;
+      
+      let raw_str: string = priceElement.innerHTML.toString();
+      let parts = [...raw_str.matchAll(/(.*)\$(\d+\.\d{2})(.*)/g)];
+      let match = parts ? parts[0] : undefined;
+      let raw_price = match ? match[2] : undefined;
+      let price = parseFloat(raw_price ?? "");
+      if (isNaN(price) === false) {
+        prices.push(price);
+      } else {
+        logger.warn(clc.yellow(`Price was NaN: ${raw_str}`));
+      }
+    } catch (e) {
+      logger.debug(`Error parsing listing: ${e}`);
+    }
+  }
+  
+  // Remove first element (often an ad or featured listing)
+  prices.splice(0, 1);
+  prices.sort((a, b) => a - b);
+  let midpoint = Math.floor(prices.length / 2);
+  if (prices.length > 0) {
+    logger.debug(clc.green(`Found ${prices.length} prices, median: $${prices[midpoint].toFixed(2)}`));
+    return prices[midpoint];
+  }
+  logger.warn(clc.yellow(`Found no prices for ${card.name}, ${type}`));
+  return 0;
+}
+

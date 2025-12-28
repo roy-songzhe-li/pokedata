@@ -6,6 +6,7 @@
         "sourceMap": true,
         "outDir": "dist",
         "noImplicitAny": false,
+        "skipLibCheck": true,
     },
     "include": ["src/**/*", "test/tests.tsec.ts"],
     "exclude": [

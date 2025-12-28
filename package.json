@@ -7,7 +7,9 @@
   "scripts": {
     "test": "c8 mocha --timeout 5000",
     "build": "tsc",
-    "data": "tsc & node dist/data-scrapper.js"
+    "data": "tsc & node dist/data-scrapper.js",
+    "price:supabase": "tsc && node dist/supabase-price-scrapper.js",
+    "price:supabase:test": "tsc && node dist/supabase-price-scrapper.js --test"
   },
   "repository": {
     "type": "git",
@@ -24,6 +26,7 @@
   },
   "homepage": "https://github.com/poketrax/pokedata#readme",
   "dependencies": {
+    "@supabase/supabase-js": "2.39.0",
     "@types/cli-color": "^2.0.2",
     "@types/minimist": "^1.2.2",
     "@types/node": "^18.11.13",
