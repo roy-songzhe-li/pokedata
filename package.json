@@ -7,7 +7,10 @@
   "scripts": {
     "test": "c8 mocha --timeout 5000",
     "build": "tsc",
-    "data": "tsc & node dist/data-scrapper.js"
+    "data": "tsc & node dist/data-scrapper.js",
+    "export:jp": "tsc && node dist/export-jp-cards.js",
+    "price:jp": "tsc && node dist/jp-price-scrapper.js",
+    "price:jp:test": "tsc && node dist/jp-price-scrapper.js --test"
   },
   "repository": {
     "type": "git",
@@ -24,10 +27,11 @@
   },
   "homepage": "https://github.com/poketrax/pokedata#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
     "@types/cli-color": "^2.0.2",
     "@types/minimist": "^1.2.2",
     "@types/node": "^18.11.13",
-    "better-sqlite3": "^7.6.2",
+    "better-sqlite3": "^12.5.0",
     "cli-color": "^2.0.3",
     "cli-progress": "^3.11.2",
     "jsdom": "^20.0.2",

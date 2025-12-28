@@ -6,11 +6,16 @@
         "sourceMap": true,
         "outDir": "dist",
         "noImplicitAny": false,
+        "skipLibCheck": true,
     },
     "include": ["src/**/*", "test/tests.tsec.ts"],
     "exclude": [
         "test",
         "./node_modules/",
-        "./dist/"
+        "./dist/",
+        "src/debug-puppeteer.ts",
+        "src/scrappers/ebay-scrapper-puppeteer.ts",
+        "src/test-ebay-api.ts",
+        "src/test-ebay-scrape.ts"
       ]
 }
