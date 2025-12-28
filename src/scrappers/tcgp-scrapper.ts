@@ -35,7 +35,7 @@ export let tcgpCodes = new Array<TcgpCode>();
 
 const TCGP_API = "https://mp-search-api.tcgplayer.com/v1/search/request";
 const TCGP_IMAGE_API = "https://product-images.tcgplayer.com/fit-in/437x437";
-const UPDATE_SET = "UPDATE expansions SET tcgName = $tcgName WHERE name = $name";
+const UPDATE_SET = "UPDATE expansions SET tcgName = $tcgName, language = $language WHERE name = $name";
 const UPDATE_CARD =
   "UPDATE cards SET " +
   "idTCGP = $idTCGP, " +
@@ -45,7 +45,8 @@ const UPDATE_CARD =
   "expCodeTCGP = $expCodeTCGP, " +
   "releaseDate = $releaseDate, " +
   "description = $description, " +
-  "variants = $variants " +
+  "variants = $variants, " +
+  "language = $language " +
   "WHERE expCardNumber = $expCardNumber AND expName = $expName";
 
 const tcgRequest = `{
@@ -126,7 +127,7 @@ export async function postTCGPRequest(url, request, set, cards): Promise<number>
   let totalresults = data.results[0].totalResults;
   for (let card of data.results[0].results) {
     if (card.productName.includes("Code Card")) continue;
-    let newCard: Card = await convertCard(card, set.name, set.releaseDate);
+    let newCard: Card = await convertCard(card, set.name, set.releaseDate, set.language);
     //console.log(`TCGP Card: ${newCard.cardId}`)
     cards.push(newCard);
   }
@@ -138,9 +139,10 @@ export async function postTCGPRequest(url, request, set, cards): Promise<number>
  * @param card
  * @param setName
  * @param setReleaseDate
+ * @param language
  * @returns
  */
-async function convertCard(card: any, setName: string, setReleaseDate: string): Promise<Card> {
+async function convertCard(card: any, setName: string, setReleaseDate: string, language: string = "en"): Promise<Card> {
   let releaseDate = card.customAttributes.releaseDate === null ? setReleaseDate : card.customAttributes.releaseDate;
   let cardNum = formatExpNumber(card.customAttributes.number.split("/")[0]);
   let img = `${TCGP_IMAGE_API}/${card.productId.toFixed()}.jpg`;
@@ -161,6 +163,7 @@ async function convertCard(card: any, setName: string, setReleaseDate: string): 
     energyType: card.customAttributes.energyType != null ? card.customAttributes.energyType[0] ?? "" : "",
     cardType: card.customAttributes.cardType != null ? card.customAttributes.cardType[0] ?? "" : "",
     variants: variants,
+    language: language,
   };
   return newCard;
 }
@@ -275,9 +278,10 @@ async function getCodes() {
  * Search for a card on tcgp
  * @param name
  * @param set set name to add to card returned
+ * @param language
  * @returns
  */
-export async function tcgpCardSearch(name: string, set: string): Promise<Card | undefined> {
+export async function tcgpCardSearch(name: string, set: string, language: string = "en"): Promise<Card | undefined> {
   let url = new URL(TCGP_API);
   url.searchParams.set("q", `${set} ${name}`);
   url.searchParams.set("isList", "false");
@@ -294,7 +298,7 @@ export async function tcgpCardSearch(name: string, set: string): Promise<Card | 
   } else {
     logger.debug(`TCGP search results ${data.results[0].productName}`);
   }
-  return await convertCard(data.results[0].results[0], set, "");
+  return await convertCard(data.results[0].results[0], set, "", language);
 }
 
 /**

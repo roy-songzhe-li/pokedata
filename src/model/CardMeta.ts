@@ -6,12 +6,14 @@ export class Expansion {
     public releaseDate: string
     public logoURL: string
     public symbolURL: string
+    public language: string = "en"
 
-    constructor(name: string, series: string, logo: string, symbol: string) {
+    constructor(name: string, series: string, logo: string, symbol: string, language: string = "en") {
         this.name = name
         this.series = series
         this.logoURL = logo
         this.symbolURL = symbol
+        this.language = language
     }
 }
 

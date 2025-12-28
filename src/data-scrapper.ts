@@ -94,7 +94,7 @@ export async function updateExpansions(language: 'en' | 'jp' = 'en'): Promise<Ex
   consoleHeader(`Searching for new sets (${language === 'en' ? 'English' : 'Japanese'})`);
   let serebiiNewSets = await getSerebiiLastestNormalExpantions(COUNT, language);
   for (let set of serebiiNewSets) {
-    let exp = await serebiiUpsertSet(set);
+    let exp = await serebiiUpsertSet(set, language);
     await updateExpansionPmc(exp);
     await updateExpansionTCGP(exp);
     if (exp) expansions.push(exp);
@@ -102,7 +102,7 @@ export async function updateExpansions(language: 'en' | 'jp' = 'en'): Promise<Ex
   consoleHeader("Searching for new promo sets");
   let serebiiPromoSets = await getSerebiiLastestPromoExpantions(COUNT - 1, language);
   for (let set of serebiiPromoSets) {
-    let exp = await serebiiUpsertSet(set);
+    let exp = await serebiiUpsertSet(set, language);
     await updateExpansionPmc(exp);
     await updateExpansionTCGP(exp);
     if (exp) expansions.push(exp);
@@ -117,7 +117,7 @@ export async function updateExpansions(language: 'en' | 'jp' = 'en'): Promise<Ex
 async function updateCards(exps: Expansion[]) {
   consoleHeader("Updating Cards");
   for (let exp of exps) {
-    logger.info(clc.blueBright(`Processing ${exp.name} Cards`));
+    logger.info(clc.blueBright(`Processing ${exp.name} Cards (${exp.language})`));
     let serebii = await getSerebiiExpantion(exp.name);
     let tcgpCards = await pullTcgpSetCards(exp);
     if (serebii == null) {
@@ -134,7 +134,7 @@ async function updateCards(exps: Expansion[]) {
       for (let card of serebiiCards) {
         await serebiiUpsertCard(card, exp);
         if (tcgpCards.length === 0) {
-          let tcgpCard = await tcgpCardSearch(card.name, exp.name);
+          let tcgpCard = await tcgpCardSearch(card.name, exp.name, exp.language);
           if (tcgpCard == null) continue;
           tcgpCard.img = card.img;
           if (tcgpCard) await tcgpUpsertCard(tcgpCard, exp);

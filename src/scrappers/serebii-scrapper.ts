@@ -24,11 +24,12 @@ import {
 } from "../database.js";
 
 const UPDATE_SET =
-  "UPDATE expansions SET numberOfCards = $numberOfCards, logoURL = $logoURL, symbolURL = $symbolURL WHERE name = $name";
+  "UPDATE expansions SET numberOfCards = $numberOfCards, logoURL = $logoURL, symbolURL = $symbolURL, language = $language WHERE name = $name";
 const UPDATE_CARD =
   "UPDATE cards " +
   "SET cardId = $cardId, " +
-  "img = $img " +
+  "img = $img, " +
+  "language = $language " +
   "WHERE expCardNumber = $expCardNumber AND expName = $expName";
 
 export type SerebiiExpantion = {
@@ -44,11 +45,13 @@ export let serebiiPromoSets = new Array<SerebiiExpantion>();
 /**
  * Get latest expansions from
  * @param num
+ * @param language
  * @returns
  */
 async function scrapeSerebiiSets(
   num: number,
-  url: string
+  url: string,
+  language: 'en' | 'jp' = 'en'
 ): Promise<SerebiiExpantion[]> {
   let res = await fetch(url);
   let data = await res.text();
@@ -59,18 +62,37 @@ async function scrapeSerebiiSets(
   num++; //increament since we start on row 1 to skip table headers
   for (let i = 1; i < num; i++) {
     let cells = setTable.rows[i].cells;
-    let pageUrl = `https://www.serebii.net${
-      (cells[2].children[0] as HTMLAnchorElement).href
-    }`;
-    sets.push({
-      name: cells[2].children[0].textContent.trim(),
-      page: pageUrl,
-      logo: await getLogoUrl(pageUrl),
-      symbol: `https://www.serebii.net${
-        (cells[0].children[0].children[0] as HTMLImageElement).src
-      }`,
-      numberOfCards: parseInt(cells[3].textContent),
-    });
+    
+    // Japanese page structure is different from English
+    if (language === 'jp') {
+      // JP: cells[0]=logo, cells[1]=name, cells[2]=card count, cells[3]=date
+      let pageUrl = `https://www.serebii.net${
+        (cells[1].children[0] as HTMLAnchorElement).href
+      }`;
+      sets.push({
+        name: cells[1].children[0].textContent.trim(),
+        page: pageUrl,
+        logo: await getLogoUrl(pageUrl),
+        symbol: `https://www.serebii.net${
+          (cells[0].children[0].children[0] as HTMLImageElement).src
+        }`,
+        numberOfCards: parseInt(cells[2].textContent),
+      });
+    } else {
+      // EN: cells[0]=symbol, cells[1]=?, cells[2]=name, cells[3]=card count
+      let pageUrl = `https://www.serebii.net${
+        (cells[2].children[0] as HTMLAnchorElement).href
+      }`;
+      sets.push({
+        name: cells[2].children[0].textContent.trim(),
+        page: pageUrl,
+        logo: await getLogoUrl(pageUrl),
+        symbol: `https://www.serebii.net${
+          (cells[0].children[0].children[0] as HTMLImageElement).src
+        }`,
+        numberOfCards: parseInt(cells[3].textContent),
+      });
+    }
   }
   return sets;
 }
@@ -78,11 +100,13 @@ async function scrapeSerebiiSets(
 /**
  * Get latest expansions from
  * @param num
+ * @param language
  * @returns
  */
 async function scrapeSerebiiPromoSets(
   num: number,
-  url: string
+  url: string,
+  language: 'en' | 'jp' = 'en'
 ): Promise<SerebiiExpantion[]> {
   let res = await fetch(url);
   let data = await res.text();
@@ -96,13 +120,23 @@ async function scrapeSerebiiPromoSets(
     let pageUrl = `https://www.serebii.net${
       (cells[0].children[0] as HTMLAnchorElement).href
     }`;
+    
+    // JP promo pages don't have a symbol column
+    let symbolUrl = '';
+    if (language === 'en' && cells.length >= 3 && cells[2].children[0]?.children[0]) {
+      symbolUrl = `https://www.serebii.net${
+        (cells[2].children[0].children[0] as HTMLImageElement).src
+      }`;
+    } else {
+      // For JP or when symbol is missing, get it from the set page
+      symbolUrl = await getLogoUrl(pageUrl);
+    }
+    
     sets.push({
       name: cells[0].children[0].textContent.trim(),
       page: pageUrl,
       logo: await getLogoUrl(pageUrl),
-      symbol: `https://www.serebii.net${
-        (cells[2].children[0].children[0] as HTMLImageElement).src
-      }`,
+      symbol: symbolUrl,
       numberOfCards: parseInt(cells[1].textContent),
     });
   }
@@ -114,7 +148,7 @@ export async function getSerebiiLastestNormalExpantions(num: number, language: '
     ? `https://www.serebii.net/card/japanese.shtml`
     : `https://www.serebii.net/card/english.shtml`;
   if (serebiiNormalSets.length >= num) return serebiiNormalSets;
-  serebiiNormalSets = await scrapeSerebiiSets(num, url);
+  serebiiNormalSets = await scrapeSerebiiSets(num, url, language);
   return serebiiNormalSets;
 }
 
@@ -123,7 +157,7 @@ export async function getSerebiiLastestPromoExpantions(num: number, language: 'e
     ? `https://www.serebii.net/card/jppromo.shtml`
     : `https://www.serebii.net/card/engpromo.shtml`;
   if (serebiiPromoSets.length >= num) return serebiiPromoSets;
-  serebiiPromoSets = await scrapeSerebiiPromoSets(num, url);
+  serebiiPromoSets = await scrapeSerebiiPromoSets(num, url, language);
   return serebiiPromoSets;
 }
 
@@ -217,6 +251,7 @@ export async function getSerebiiSetCards(
       rarity: rarity,
       img: img,
       energyType: energy,
+      language: set.language,
     });
   }
   return cards;
@@ -303,18 +338,21 @@ function parseEnergy(cell: HTMLTableCellElement): string {
 /**
  * Upsert a serebii set
  * @param set
+ * @param language
  * @returns
  */
 export async function serebiiUpsertSet(
-  set: SerebiiExpantion
+  set: SerebiiExpantion,
+  language: string = "en"
 ): Promise<Expansion | undefined> {
-  logger.info(clc.green(`Processing Serebii Set: ${set.name}`));
+  logger.info(clc.green(`Processing Serebii Set: ${set.name} (${language})`));
   let series = getLatestSeries();
   let foundName = expantionExistsInDB(set.name);
   let exp: Expansion;
   if (foundName) {
     exp = getExpansion(foundName);
     exp.numberOfCards = set.numberOfCards;
+    exp.language = language;
     let dlLogoPath = `./images/exp_logo/${exp.name.replaceAll(" ", "-")}.png`;
     logger.debug(`Logo file: ${dlLogoPath}`);
     let dlSymblPath = `./images/exp_symb/${exp.name.replaceAll(" ", "-")}.png`;
@@ -342,7 +380,8 @@ export async function serebiiUpsertSet(
       normalizeSetName(set.name).replace("PKM", "Pokemon"),
       series,
       set.logo,
-      set.symbol
+      set.symbol,
+      language
     );
     exp.numberOfCards = set.numberOfCards;
     exp.releaseDate = "";

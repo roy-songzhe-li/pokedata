@@ -2,7 +2,7 @@ import minimist, { ParsedArgs } from 'minimist';
 import * as cliProgress from 'cli-progress';
 import { consoleHeader, logger, setUpLogger } from './common-lite.js';
 import clc from 'cli-color';
-import { scrapeEbay } from './scrappers/ebay-scrapper-lite.js';
+import { scrapeEbay, closeBrowser } from './scrappers/ebay-scrapper-puppeteer.js';
 import { 
   testSupabaseConnection 
 } from './supabase-client.js';
@@ -49,6 +49,7 @@ export async function run() {
   if (args.t) {
     logger.info(clc.cyan('Running in TEST mode - scraping 5 random cards'));
     await pullRandomCardPrices(5);
+    await closeBrowser();
     return;
   }
   
@@ -57,6 +58,7 @@ export async function run() {
     const rarities = args.rarity.split(',');
     logger.info(clc.cyan(`Scraping cards with rarities: ${rarities.join(', ')}`));
     await pullPricesByRarity(rarities, args.limit);
+    await closeBrowser();
     return;
   }
   
@@ -65,12 +67,16 @@ export async function run() {
     logger.info(clc.cyan('Scraping rare cards only'));
     const rareRarities = ['Ultra Rare', 'Secret Rare', 'Hyper Rare', 'Special Illustration Rare', 'Illustration Rare'];
     await pullPricesByRarity(rareRarities, args.limit);
+    await closeBrowser();
     return;
   }
   
   // Default: scrape cards that need updates
   logger.info(clc.cyan(`Scraping up to ${args.limit} cards with no prices or prices older than ${args.days} days`));
   await pullPricesForOutdatedCards(args.days, args.limit);
+  
+  // Close browser before exit
+  await closeBrowser();
 }
 
 /**

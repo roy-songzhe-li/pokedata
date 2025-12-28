@@ -16,6 +16,7 @@ export class Card {
     public variants?: string[]
     public vairantMap?: Variant[]
     public img?: string;
+    public language?: string;
     //collection vrs
     public tags?: string[]
     public variant?: string

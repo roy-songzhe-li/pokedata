@@ -113,7 +113,7 @@ export function getLatestSeries(): string {
  */
 export function upsertExpantion(exp: Expansion, update: string) {
   let _exp = JSON.parse(JSON.stringify(exp));
-  let db_exp = db.prepare(`SELECT * FROM expansions WHERE name = '${exp.name}'`).get();
+  let db_exp = db.prepare(`SELECT * FROM expansions WHERE name = $name`).get({ name: exp.name });
   if (db_exp == null) {
     logger.info(clc.greenBright(`Adding new set ${JSON.stringify(exp)}`));
     db.prepare(ADD_SET).run(_exp);
@@ -148,6 +148,7 @@ export function upsertCard(card: Card, update: string) {
     cardType: card.cardType,
     pokedex: card.pokedex,
     variants: JSON.stringify(card.variants),
+    language: card.language || 'en',
   };
   if (findCardComplex(card.expName, card.expCardNumber) == null) {
     try {
