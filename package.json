@@ -10,7 +10,9 @@
     "data": "tsc & node dist/data-scrapper.js",
     "export:jp": "tsc && node dist/export-jp-cards.js",
     "price:jp": "tsc && node dist/jp-price-scrapper.js",
-    "price:jp:test": "tsc && node dist/jp-price-scrapper.js --test"
+    "price:jp:test": "tsc && node dist/jp-price-scrapper.js --test",
+    "price:jp:fast": "tsc && node dist/jp-price-scrapper-fast.js",
+    "price:jp:fast:test": "tsc && node dist/jp-price-scrapper-fast.js --test"
   },
   "repository": {
     "type": "git",

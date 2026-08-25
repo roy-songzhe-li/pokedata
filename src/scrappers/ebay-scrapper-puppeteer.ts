@@ -67,8 +67,9 @@ export async function scrapeEbay(card: any, type: string): Promise<number> {
 
   url.searchParams.set("kw", searchQuery);
   url.searchParams.set("LH_BIN", "1"); // Buy It Now only
-  url.searchParams.set("_sop", "15"); // Sort by price + shipping: lowest first
-  // Note: Not using LH_Sold - we want active listings, not sold items
+  url.searchParams.set("LH_Sold", "1"); // Sold listings only
+  url.searchParams.set("LH_Complete", "1"); // Completed listings
+  url.searchParams.set("_sop", "12"); // Sort by: Time: ending soonest
 
   logger.info(`ebay ${type} search: ${searchQuery}`);
   logger.debug(`URL: ${url.toString()}`);
